@@ -9,7 +9,7 @@ async function asUser(id: string) { await pg.exec(`reset role; set role authenti
 async function call<T = any>(sql: string, params: any[] = []): Promise<T> { const r = await pg.query<{ value: T }>(`select ${sql} as value`, params); return r.rows[0].value; }
 beforeAll(async () => {
   pg = new PGlite();
-  await pg.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
+  await pg.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
   for (const file of (await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(file=>file.endsWith('.sql')).sort()) {
     await pg.exec(await readFile(new URL('../supabase/migrations/'+file, import.meta.url), 'utf8'));
     if(file==='202611210001_initial.sql') await pg.exec(`insert into auth.users values('${A}'); insert into public.questions(user_id,category,stem,choices,correct_index) values ('${A}','데이터베이스론','기존 문제','["A","B"]',0);`);
@@ -17,7 +17,7 @@ beforeAll(async () => {
   migrationCategories=(await pg.query<{name:string}>('select name from public.user_categories')).rows.map(row=>row.name);
 }, 30000);
 beforeEach(async () => {
-  await pg.exec(`reset role; truncate public.attempts,public.exams,public.questions,public.user_categories,public.user_settings,auth.users cascade; insert into auth.users values('${A}'),('${B}');`);
+  await pg.exec(`reset role; truncate account_private.signup_limits; truncate public.attempts,public.exams,public.questions,public.user_categories,public.user_settings,auth.users cascade; insert into auth.users values('${A}'),('${B}');`);
   await asUser(A);
   await pg.exec(`insert into public.user_categories(name) values ('프로그래밍언어론'),('데이터베이스론');`);
   await pg.query(`insert into public.questions(id,category,stem,choices,correct_index,page,explanation) values ($1,'프로그래밍언어론','문제 A','["보기1","보기2"]',1,'721','원래 해설'),($2,'데이터베이스론','문제 B','["참","거짓"]',0,'569','DB 해설')`, [Q1, Q2]);
@@ -100,5 +100,15 @@ describe('초대한 참여자끼리만 공유하는 유튜브 방',()=>{
  it('잘못된 영상 ID·위치·재생 속도를 거부한다',async()=>{
   await expect(call('public.watch_create($1)',['https://evil.example'])).rejects.toThrow();const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);
   await expect(call('public.watch_update($1,$2,-1,true,1,0)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('재생 상태');await expect(call('public.watch_update($1,$2,0,true,100,0)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('재생 상태');
+ });
+});
+
+describe('공개 회원가입의 서버 전용 요청 제한',()=>{
+ it('일반 사용자와 비로그인 사용자는 가입 제한 함수를 호출할 수 없다',async()=>{
+  await expect(call('public.account_signup_slot($1,$2)',['global','global'])).rejects.toThrow();await pg.exec('reset role; set role anon;');await expect(call('public.account_signup_slot($1,$2)',['global','global'])).rejects.toThrow();
+ });
+ it('서버만 가입 요청 한도를 소비하고 시간 경과 후 다시 허용한다',async()=>{
+  await pg.exec('reset role; set role service_role;');for(let i=0;i<10;i++)expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(true);expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(false);
+  await pg.exec("reset role; update account_private.signup_limits set window_started_at=now()-interval '2 hours'; set role service_role;");expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(true);
  });
 });

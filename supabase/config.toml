@@ -1,0 +1,3 @@
+[functions.username-signup]
+# Unauthenticated signup verifies the project publishable key in its handler.
+verify_jwt = false

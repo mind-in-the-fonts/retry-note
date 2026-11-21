@@ -1,3 +1,4 @@
+import { usernameEmail } from '../supabase/functions/_shared/account.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Attempt, Exam, ExplanationPatch, Question, Statistics, UserCategory, UserSettings } from './core';
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -46,4 +47,15 @@ export async function saveFont(fontId: string) {
   const {data,error}=await db().auth.getUser(); if(error)throw new Error(error.message); const user=data.user;
   if(!user) throw new Error('로그인이 필요합니다.');
   check(await db().from('user_settings').upsert({user_id:user.id,font_id:fontId}));
+}
+
+export async function loginUsername(username:string,password:string) {
+  const {error}=await db().auth.signInWithPassword({email:await usernameEmail(username),password});
+  if(error)throw Error(error.code==='invalid_credentials'?'아이디 또는 비밀번호를 확인해주세요.':error.status===429?'로그인 시도가 많습니다. 잠시 후 다시 시도해주세요.':'로그인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+}
+export async function registerUsername(username:string,password:string) {
+  if(!configured)throw Error('서버 연결을 확인해주세요.');
+  const response=await fetch(url+'/functions/v1/username-signup',{method:'POST',headers:{apikey:key,'Content-Type':'application/json'},body:JSON.stringify({username,password}),signal:AbortSignal.timeout(20000)});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(result.message||'회원가입을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.');
 }
