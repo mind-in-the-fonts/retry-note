@@ -176,3 +176,30 @@ describe('공부 보상·상점 활동 기록',()=>{
  });
  it('무제한 조회나 잘못된 필터 요청을 거부한다',async()=>{await expect(call('public.game_activity($1)',['other'])).rejects.toThrow('조회 조건');await expect(call('public.game_activity($1,$2,null,null,null,null,10000)',['all',''])).rejects.toThrow('조회 조건');});
 });
+
+describe('방 이름과 캐릭터 착용 아이템',()=>{
+ it('방장만 이름을 바꾸며 재생 시간 기준과 위치를 보존한다',async()=>{
+  const created=await call('public.watch_create_named($1,$2)',['M7lc1UVf-VE','  주말 공부방  ']);expect(created.room.name).toBe('주말 공부방');
+  const playing=await call('public.watch_update($1,$2,123,true,1,$3)',[created.room.id,'M7lc1UVf-VE',created.room.version]);
+  const renamed=await call('public.watch_rename($1,$2)',[created.room.id,'퇴근하고 모여요']);expect(renamed.room.name).toBe('퇴근하고 모여요');expect(renamed.room.position).toBe(123);expect(renamed.room.updated_at).toBe(playing.room.updated_at);expect(renamed.room.playing).toBe(true);expect(renamed.room.version).toBe(playing.room.version+1);
+  const stale=await call('public.watch_update($1,$2,1,false,1,$3)',[created.room.id,'M7lc1UVf-VE',playing.room.version]);expect(stale.applied).toBe(false);expect(stale.room.name).toBe('퇴근하고 모여요');
+  await asUser(B);await call('public.watch_join($1)',[created.room.id]);await expect(call('public.watch_rename($1,$2)',[created.room.id,'탈취'])).rejects.toThrow('만든 사용자');
+  expect((await call('public.watch_get($1)',[created.room.id])).room.name).toBe('퇴근하고 모여요');
+ });
+ it('뽀모도로도 이름을 정해 만들고 빈 이름과 너무 긴 이름을 거절한다',async()=>{
+  const created=await call('public.pomo_create_named($1,$2)',['pts1U6XuXlA','오전 집중']);expect(created.room.name).toBe('오전 집중');expect(created.room.mode).toBe('pomodoro');
+  await expect(call('public.watch_rename($1,$2)',[created.room.id,'   '])).rejects.toThrow('1~60');await expect(call('public.watch_rename($1,$2)',[created.room.id,'가'.repeat(61)])).rejects.toThrow('1~60');
+  await call('public.watch_close($1)',[created.room.id]);await expect(call('public.watch_rename($1,$2)',[created.room.id,'종료 후'])).rejects.toThrow('열린 방');
+ });
+ it('구매한 옷만 착용하고 같은 부위는 교체하며 다른 부위와 가구는 유지한다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);
+  for(const id of ['berry-beret','straw-hat','mint-scarf','round-glasses','mug'])await call('public.game_buy($1)',[id]);
+  for(const id of ['berry-beret','mint-scarf','round-glasses','mug'])await call('public.game_place($1,true,50,65)',[id]);
+  await call('public.game_place($1,true,50,65)',['straw-hat']);const state=await call('public.game_state()');
+  expect(state.inventory.filter((i:any)=>i.placed).map((i:any)=>i.item_id).sort()).toEqual(['mint-scarf','mug','round-glasses','straw-hat']);
+  await expect(call('public.game_place($1,true,50,65)',['royal-crown'])).rejects.toThrow('보유한 아이템');
+  await asUser(B);await expect(call('public.game_place($1,true,50,65)',['straw-hat'])).rejects.toThrow('보유한 아이템');
+  const visit=await call('public.game_visit($1)',[A]);expect(visit.inventory.filter((i:any)=>i.placed)).toHaveLength(4);
+  await asUser(A);await call('public.game_place($1,false,50,65)',['straw-hat']);expect((await call('public.game_state()')).inventory.find((i:any)=>i.item_id==='straw-hat').placed).toBe(false);
+ });
+});

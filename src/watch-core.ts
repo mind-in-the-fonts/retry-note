@@ -1,5 +1,5 @@
 export interface WatchRoom {
- mode?:'watch'|'pomodoro';id:string;owner_id:string;video_id:string;position:number;playing:boolean;playback_rate:number;version:number;updated_at:string;updated_by:string|null;closed:boolean;created_at:string;
+ mode?:'watch'|'pomodoro';name?:string;id:string;owner_id:string;video_id:string;position:number;playing:boolean;playback_rate:number;version:number;updated_at:string;updated_by:string|null;closed:boolean;created_at:string;
 }
 export interface WatchSnapshot {room:WatchRoom;serverNow:string;memberCount:number;members?:{id:string;name:string;character:string}[];applied?:boolean}
 export interface WatchCommand {videoId:string;position:number;playing:boolean;rate:number}

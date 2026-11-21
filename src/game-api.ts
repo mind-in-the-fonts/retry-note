@@ -1,6 +1,6 @@
 import {db} from './api';
 export interface Wallet {coins:number;xp:number;character:string;background:string}
-export interface Item {id:string;name:string;price:number;kind:string;description:string}
+export interface Item {id:string;name:string;price:number;kind:string;description:string;slot?:'hat'|'face'|'outfit'|null}
 export interface Owned {item_id:string;placed:boolean;x:number;y:number}
 export interface Reward {id:string;kind:string;base:number;random_bonus:number;correct_bonus:number;total:number;minutes:number;created_at:string}
 export interface GameState {wallet:Wallet;inventory:Owned[];items:Item[];recent:Reward[];communityMinutes:number}
