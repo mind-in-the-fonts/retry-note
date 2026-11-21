@@ -9,7 +9,7 @@ async function asUser(id: string) { await pg.exec(`reset role; set role authenti
 async function call<T = any>(sql: string, params: any[] = []): Promise<T> { const r = await pg.query<{ value: T }>(`select ${sql} as value`, params); return r.rows[0].value; }
 beforeAll(async () => {
   pg = new PGlite();
-  await pg.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
+  await pg.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
   for (const file of (await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(file=>file.endsWith('.sql')).sort()) {
     await pg.exec(await readFile(new URL('../supabase/migrations/'+file, import.meta.url), 'utf8'));
     if(file==='202611210001_initial.sql') await pg.exec(`insert into auth.users values('${A}'); insert into public.questions(user_id,category,stem,choices,correct_index) values ('${A}','데이터베이스론','기존 문제','["A","B"]',0);`);
@@ -110,5 +110,40 @@ describe('공개 회원가입의 서버 전용 요청 제한',()=>{
  it('서버만 가입 요청 한도를 소비하고 시간 경과 후 다시 허용한다',async()=>{
   await pg.exec('reset role; set role service_role;');for(let i=0;i<10;i++)expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(true);expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(false);
   await pg.exec("reset role; update account_private.signup_limits set window_started_at=now()-interval '2 hours'; set role service_role;");expect(await call('public.account_signup_slot($1,$2)',['ip','test-ip-hash'])).toBe(true);
+ });
+});
+
+describe('공부 보상과 내 방 경제',()=>{
+ it('등록은 보상을 주지 않고, 실제 풀이만 하루 한 번 랜덤 코인을 지급한다',async()=>{
+  let state=await call('public.game_state()');expect(state.wallet.coins).toBe(0);const ex=await call('public.start_exam($1,0)',[['프로그래밍언어론']]);const answer=await call('public.submit_answer($1,0,1)',[ex.id]);const reward=await call('public.game_attempt_reward($1)',[answer.id]);expect(reward.base).toBe(3);expect(reward.random_bonus).toBeGreaterThanOrEqual(0);expect(reward.random_bonus).toBeLessThanOrEqual(4);expect(reward.correct_bonus).toBe(2);expect(await call('public.game_attempt_reward($1)',[answer.id])).toBeNull();
+  const again=await call('public.start_exam($1,0)',[['프로그래밍언어론']]);await call('public.submit_answer($1,0,1)',[again.id]);state=await call('public.game_state()');expect(state.wallet.coins).toBe(reward.total);expect(state.recent).toHaveLength(1);
+ });
+ it('가격은 서버에서 계산하고 중복 구매는 코인을 재차감하지 않는다',async()=>{
+  await call('public.game_state()');await expect(call('public.game_buy($1)',['desk'])).rejects.toThrow('코인');await pg.exec(`reset role; update public.game_wallets set coins=10000 where user_id='${A}';`);await asUser(A);
+  const state=await call('public.game_buy($1)',['desk']);expect(state.wallet.coins).toBe(4000);const again=await call('public.game_buy($1)',['desk']);expect(again.wallet.coins).toBe(4000);expect(again.inventory).toHaveLength(1);await expect(pg.exec('update public.game_wallets set coins=999999')).rejects.toThrow();
+ });
+ it('자기가 구매한 가구만 배치하고 다른 사용자 보관함은 볼 수 없다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role; update public.game_wallets set coins=10000 where user_id='${A}';`);await asUser(A);await call('public.game_buy($1)',['mug']);await call('public.game_place($1,true,40,65)',['mug']);await expect(call('public.game_place($1,true,40,65)',['bed'])).rejects.toThrow('보유');await expect(call('public.game_place($1,true,500,65)',['mug'])).rejects.toThrow('위치');
+  await asUser(B);expect((await pg.query('select * from public.game_inventory')).rows).toHaveLength(0);const visit=await call('public.game_visit($1)',[A]);expect(visit.inventory).toHaveLength(1);expect(visit).not.toHaveProperty('coins');expect(visit).not.toHaveProperty('recent');
+ });
+ it('요청한 일곱 캐릭터는 무료로 선택하지만 유료 배경은 구매해야 한다',async()=>{
+  for(const id of ['usagi','hachiware','kurimanju','shisa','momonga','furuhonya','anoko']){await call('public.game_style($1,$2)',[id,'cloud']);expect((await call('public.game_state()')).wallet.character).toBe(id);}await expect(call('public.game_style($1,$2)',['usagi','night'])).rejects.toThrow('구매');
+ });
+});
+describe('뽀모도로 완료 확인과 참여 시간',()=>{
+ it('정해진 여섯 영상만 공부방으로 만들고 영상·배속 변경은 차단한다',async()=>{
+  expect((await pg.query('select * from public.pomodoro_catalog')).rows).toHaveLength(6);await expect(call('public.pomo_create($1)',['dQw4w9WgXcQ'])).rejects.toThrow('등록된');const made=await call('public.pomo_create($1)',['pts1U6XuXlA']);expect(made.room.mode).toBe('pomodoro');await expect(call('public.watch_update($1,$2,0,true,2,0)',[made.room.id,'pts1U6XuXlA'])).rejects.toThrow('고정');
+ });
+ it('목표 메모는 개인별로 보관하며 재생 위치를 건너뛰어도 보상을 주지 않는다',async()=>{
+  const made=await call('public.pomo_create($1)',['pts1U6XuXlA']);await call('public.pomo_goal($1,0,$2)',[made.room.id,'책 20쪽 읽기']);await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);await call('public.watch_update($1,$2,3000,true,1,0)',[made.room.id,'pts1U6XuXlA']);await call('public.pomo_heartbeat($1,3000,true)',[made.room.id]);await expect(call('public.pomo_claim($1,0,true)',[made.room.id])).rejects.toThrow('공부 구간');
+  await asUser(B);await call('public.watch_join($1)',[made.room.id]);expect((await pg.query('select * from public.pomodoro_progress')).rows).toHaveLength(0);await call('public.pomo_goal($1,0,$2)',[made.room.id,'친구의 별도 목표']);await asUser(A);expect((await pg.query<{goal:string}>('select goal from public.pomodoro_progress')).rows[0].goal).toBe('책 20쪽 읽기');
+ });
+ it('실제 시간으로 누적한 회차가 끝나야 확인 보상을 한 번 지급한다',async()=>{
+  const made=await call('public.pomo_create($1)',['pts1U6XuXlA']);await call('public.watch_update($1,$2,2940,true,1,0)',[made.room.id,'pts1U6XuXlA']);await call('public.pomo_heartbeat($1,2940,true)',[made.room.id]);
+  await pg.exec(`reset role; update public.watch_rooms set updated_at=clock_timestamp()-interval '60 seconds' where id='${made.room.id}'; update game_private.presence set last_at=clock_timestamp()-interval '60 seconds' where user_id='${A}'; insert into public.pomodoro_progress(user_id,room_id,cycle,focus_seconds) values('${A}','${made.room.id}',0,2940);`);await asUser(A);
+  const progress=await call('public.pomo_heartbeat($1,3000,true)',[made.room.id]);expect(progress[0].completed_at).not.toBeNull();await expect(call('public.pomo_claim($1,0,false)',[made.room.id])).rejects.toThrow('확인');const reward=await call('public.pomo_claim($1,0,true)',[made.room.id]);expect(reward.base).toBe(100);expect(reward.total).toBeGreaterThanOrEqual(110);expect(reward.total).toBeLessThanOrEqual(300);expect(await call('public.pomo_claim($1,0,true)',[made.room.id])).toBeNull();expect((await call('public.game_state()')).wallet.coins).toBe(reward.total);
+ });
+ it('한 계정의 두 방에서 같은 시간에 공부 시간을 중복 누적하지 않는다',async()=>{
+  const one=await call('public.pomo_create($1)',['pts1U6XuXlA']);const two=await call('public.pomo_create($1)',['pts1U6XuXlA']);await call('public.watch_update($1,$2,0,true,1,0)',[one.room.id,'pts1U6XuXlA']);await call('public.watch_update($1,$2,0,true,1,0)',[two.room.id,'pts1U6XuXlA']);await call('public.pomo_heartbeat($1,0,true)',[one.room.id]);await call('public.pomo_heartbeat($1,0,true)',[two.room.id]);await pg.exec(`reset role; update public.watch_rooms set updated_at=clock_timestamp()-interval '30 seconds'; update game_private.presence set last_at=clock_timestamp()-interval '30 seconds';`);await asUser(A);const data=await call('public.pomo_heartbeat($1,30,true)',[one.room.id]);expect(data).toHaveLength(0);
  });
 });

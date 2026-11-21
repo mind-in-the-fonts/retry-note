@@ -1,0 +1,4 @@
+// @vitest-environment jsdom
+import React from 'react';import {afterEach,expect,it,vi} from 'vitest';import {act,cleanup,render,screen} from '@testing-library/react';import {RewardToast} from './RewardToast';
+afterEach(()=>{cleanup();vi.useRealTimers();});
+it('보상 합계와 내역을 표시하고 5초 뒤 다음 알림으로 넘어간다',()=>{vi.useFakeTimers();render(<RewardToast/>);const reward={id:'first',kind:'pomodoro',base:100,random_bonus:42,correct_bonus:0,total:142,minutes:50};act(()=>{window.dispatchEvent(new CustomEvent('study-reward',{detail:reward}));window.dispatchEvent(new CustomEvent('study-reward',{detail:{...reward,id:'second',total:150,random_bonus:50}}));});expect(screen.getByText('+142코인 받았어요!')).toBeTruthy();expect(screen.getByText('기본 100 + 랜덤 42')).toBeTruthy();act(()=>vi.advanceTimersByTime(5000));expect(screen.getByText('+150코인 받았어요!')).toBeTruthy();act(()=>vi.advanceTimersByTime(5000));expect(screen.queryByRole('status')).toBeNull();});

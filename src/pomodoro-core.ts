@@ -1,0 +1,3 @@
+import catalog from './pomodoro-catalog.json';
+export const POMODORO_VIDEOS=catalog;
+export function pomoPhase(videoId:string,position:number){const video=catalog.find(v=>v.id===videoId);if(!video)return null;const focus=video.sessions.findIndex(s=>position>=s.start&&position<s.end);if(focus>=0)return {video,cycle:focus,kind:'focus' as const,remaining:Math.max(0,video.sessions[focus].end-position)};const next=video.sessions.findIndex(s=>s.start>position);return {video,cycle:next>=0?next:video.sessions.length-1,kind:next>=0?'rest' as const:'done' as const,remaining:next>=0?video.sessions[next].start-position:0};}

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "usagi",
+    "name": "우사기",
+    "image": "characters/usagi.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/03usagi.png?v=1766471469&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/usagi"
+  },
+  {
+    "id": "hachiware",
+    "name": "하치와레",
+    "image": "characters/hachiware.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/02hachiware.png?v=1766471495&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/hachiware"
+  },
+  {
+    "id": "kurimanju",
+    "name": "쿠리만쥬",
+    "image": "characters/kurimanju.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/05kurimanju.png?v=1766471420&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/kurimanju"
+  },
+  {
+    "id": "shisa",
+    "name": "시사",
+    "image": "characters/shisa.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/07sisa.png?v=1766471376&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/shisa"
+  },
+  {
+    "id": "momonga",
+    "name": "모몽가",
+    "image": "characters/momonga.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/04momonga.png?v=1766471446&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/momonga"
+  },
+  {
+    "id": "furuhonya",
+    "name": "카니",
+    "image": "characters/furuhonya.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/08furuhonya.png?v=1766471345&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/furuhonya"
+  },
+  {
+    "id": "anoko",
+    "name": "아노코",
+    "image": "characters/anoko.png",
+    "source": "https://chiikawamarket.jp/cdn/shop/collections/09anoko.png?v=1766471317&width=480",
+    "sourcePage": "https://chiikawamarket.jp/collections/anoko"
+  }
+]

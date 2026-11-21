@@ -1,7 +1,7 @@
 export interface WatchRoom {
- id:string;owner_id:string;video_id:string;position:number;playing:boolean;playback_rate:number;version:number;updated_at:string;updated_by:string|null;closed:boolean;created_at:string;
+ mode?:'watch'|'pomodoro';id:string;owner_id:string;video_id:string;position:number;playing:boolean;playback_rate:number;version:number;updated_at:string;updated_by:string|null;closed:boolean;created_at:string;
 }
-export interface WatchSnapshot {room:WatchRoom;serverNow:string;memberCount:number;applied?:boolean}
+export interface WatchSnapshot {room:WatchRoom;serverNow:string;memberCount:number;members?:{id:string;name:string;character:string}[];applied?:boolean}
 export interface WatchCommand {videoId:string;position:number;playing:boolean;rate:number}
 export function youtubeId(input:string):string {
  let url:URL;try{url=new URL(input.trim());}catch{throw Error('유튜브 영상 URL을 입력해주세요.');}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "usagi",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 690,
+    "y": 0,
+    "width": 335,
+    "height": 463,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "hachiware",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 343,
+    "y": 0,
+    "width": 335,
+    "height": 374,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "kurimanju",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 1457,
+    "y": 0,
+    "width": 308,
+    "height": 365,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "shisa",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 2636,
+    "y": 0,
+    "width": 400,
+    "height": 355,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "momonga",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 1035,
+    "y": 0,
+    "width": 419,
+    "height": 391,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "furuhonya",
+    "sheet": "characters/official-character-sheet.png",
+    "sheetWidth": 3766,
+    "sheetHeight": 463,
+    "x": 3456,
+    "y": 0,
+    "width": 310,
+    "height": 424,
+    "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
+    "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  }
+]

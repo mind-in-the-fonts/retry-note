@@ -48,7 +48,7 @@ export class WatchSync {
    if(!this.publishing&&[1,2].includes(state)&&Math.abs(this.player.getCurrentTime()-this.position)>1.75)this.apply();
   }
   if(this.now()>=this.suppressedUntil)this.sample={position:this.player.getCurrentTime(),at:this.now(),state,rate:this.player.getPlaybackRate()||1};
-  return {position:this.enabled?this.player.getCurrentTime():this.position,duration:this.player.getDuration(),enabled:this.enabled};
+  return {playing:this.player.getPlayerState()===1,position:this.enabled?this.player.getCurrentTime():this.position,duration:this.player.getDuration(),enabled:this.enabled};
  }
  dispose(){this.disposed=true;}
 }
