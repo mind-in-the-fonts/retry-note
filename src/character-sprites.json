@@ -70,5 +70,18 @@
     "height": 424,
     "source": "https://www.anime-chiikawa.jp/images/characters/img_charapage.png",
     "sourcePage": "https://www.anime-chiikawa.jp/chara.html"
+  },
+  {
+    "id": "anoko",
+    "sheet": "characters/anoko-full-body.png",
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "x": 90,
+    "y": 109,
+    "width": 992,
+    "height": 1054,
+    "source": "https://chiikawamarket.jp/cdn/shop/files/4571609362999_1.jpg?v=1742205232",
+    "sourcePage": "https://chiikawamarket.jp/collections/anoko",
+    "processing": "Official full-body reference; background and lettering removed with built-in imagegen, preserving the character and held ice cream."
   }
 ]
