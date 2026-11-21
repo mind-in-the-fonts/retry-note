@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1",
-    "build:pages": "tsc --noEmit && vite build --base=/retry-note/ --outDir docs"
+    "build:pages": "tsc --noEmit && vite build --base=/retry-note/ --outDir docs",
+    "build:cloudflare": "tsc --noEmit && vite build --base=/ --outDir dist",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist --project-name retry-note --branch main"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
@@ -22,6 +24,7 @@
     "@types/react-dom": "19.3.0",
     "typescript": "7.0.2",
     "vite": "8.3.8",
-    "vitest": "5.1.1"
+    "vitest": "5.1.1",
+    "wrangler": "4.166.0"
   }
 }

@@ -47,6 +47,20 @@ npm run dev
 
 ## 검증과 배포
 
+### Cloudflare Pages
+
+`retry-note.pages.dev`를 목표 주소로 사용하며, 실제 할당 주소는 Cloudflare 프로젝트 생성 결과로 확인합니다. Pages 직접 업로드용 빌드는 사이트 루트(`/`)를 사용합니다. 기존 GitHub Pages용 `docs/` 빌드와 구분됩니다.
+
+```sh
+npx wrangler login
+npx wrangler pages project create retry-note --production-branch main
+npm run deploy:cloudflare
+```
+
+최초 프로젝트 생성은 한 번만 실행합니다. 로그인 토큰과 `.env.local`은 저장소에 올리지 않습니다. 이후 배포에는 `npm run deploy:cloudflare`를 사용합니다. 새 주소를 게시한 뒤 Supabase Auth의 Site URL과 Redirect URLs에도 실제 주소를 등록해야 로그인이 새 사이트로 돌아옵니다. GitHub OAuth 앱의 callback URL은 Supabase 주소이므로 변경하지 않습니다. 기존 GitHub Pages 주소는 별도로 유지됩니다.
+
+### GitHub Pages
+
 ```sh
 npm test
 npm run build
