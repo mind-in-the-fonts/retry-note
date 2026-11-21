@@ -1,5 +1,6 @@
-export const CATEGORIES = ['전자계산기구조론', '운영체제론', '데이터통신론', '자료구조론', '데이터베이스론', '소프트웨어공학론', '프로그래밍언어론', '스프레드시트'] as const;
-export type Category = typeof CATEGORIES[number];
+export type Category = string;
+export interface UserCategory { name: string; createdAt: string }
+export interface UserSettings { fontId: string }
 export interface Question {
   id: string; category: Category; stem: string; choices: string[]; correctIndex: number;
   explanation: string; page: string; bookNumber: string; firstWrongDate: string;
@@ -29,10 +30,11 @@ export function sampleQuestions<T>(items: readonly T[], limit: number | 'all', r
   return limit === 'all' ? shuffled : shuffled.slice(0, Math.max(0, limit));
 }
 const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
-export function validateQuestion(input: unknown): Question {
+export function validateQuestion(input: unknown, allowedCategories?: readonly string[]): Question {
   if (!isObject(input)) throw new Error('문제 형식이 올바르지 않습니다.');
   const q = input;
-  if (!CATEGORIES.includes(q.category as Category)) throw new Error('지원하지 않는 과목입니다.');
+  if (typeof q.category !== 'string' || !q.category.trim() || q.category.length > 80) throw new Error('과목을 선택해주세요.');
+  if (allowedCategories && !allowedCategories.includes(q.category)) throw new Error('설정에 등록한 과목을 선택해주세요.');
   if (typeof q.stem !== 'string' || !q.stem.trim() || q.stem.length > 30000) throw new Error('문제 내용을 입력해주세요. (최대 30,000자)');
   if (!Array.isArray(q.choices) || q.choices.length < 2 || q.choices.length > 8 || q.choices.some(c => typeof c !== 'string' || !c.trim() || c.length > 15000)) throw new Error('보기를 2~8개 입력해주세요.');
   if (!Number.isInteger(q.correctIndex) || Number(q.correctIndex) < 0 || Number(q.correctIndex) >= q.choices.length) throw new Error('정답 보기를 선택해주세요.');
@@ -40,11 +42,11 @@ export function validateQuestion(input: unknown): Question {
   for (const key of ['page', 'bookNumber', 'explanation']) if (q[key] != null && typeof q[key] !== 'string') throw new Error('문제의 텍스트 항목을 확인해주세요.');
   return { id: typeof q.id === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(q.id) ? q.id : crypto.randomUUID(), category: q.category as Category, stem: q.stem.trim(), choices: (q.choices as string[]).map(c => c.trim()), correctIndex: Number(q.correctIndex), explanation: String(q.explanation || ''), page: String(q.page || ''), bookNumber: String(q.bookNumber || ''), firstWrongDate: q.firstWrongDate };
 }
-export function parseQuestions(text: string): Question[] {
+export function parseQuestions(text: string, allowedCategories?: readonly string[]): Question[] {
   const raw: unknown = JSON.parse(text);
   const items = Array.isArray(raw) ? raw : isObject(raw) ? raw.questions : null;
   if (!Array.isArray(items) || !items.length || items.length > 500) throw new Error('한 번에 문제 1~500개를 가져올 수 있습니다.');
-  const result = items.map(validateQuestion);
+  const result = items.map(item => validateQuestion(item, allowedCategories));
   if (new Set(result.map(q => q.id)).size !== result.length) throw new Error('중복된 문제 ID가 있습니다.');
   return result;
 }

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Attempt, Exam, ExplanationPatch, Question, Statistics } from './core';
+import type { Attempt, Exam, ExplanationPatch, Question, Statistics, UserCategory, UserSettings } from './core';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const configured = Boolean(url && /^https:\/\//.test(url) && key && !url.includes('YOUR_PROJECT'));
@@ -33,4 +33,17 @@ export async function nextQuestion(examId: string): Promise<Exam> { const x = ch
 export async function currentAttempt(examId: string, position: number): Promise<Attempt | null> { const x = check(await db().from('attempts').select('*').eq('exam_id', examId).eq('position', position).maybeSingle()); return x ? attemptRow(x) : null; }
 export async function examAttempts(id: string): Promise<Attempt[]> { const xs = check(await db().from('attempts').select('*').eq('exam_id', id).order('position')); return (xs || []).map(attemptRow); }
 export async function history(): Promise<Attempt[]> { const xs = check(await db().from('attempts').select('*').order('answered_at', { ascending: false }).limit(100)); return (xs || []).map(attemptRow); }
-export async function backup() { const [questions, attempts, exams] = await Promise.all([allRows('questions', true), allRows('attempts'), allRows('exams')]); return { schemaVersion: 1, exportedAt: new Date().toISOString(), questions: questions.map(fromRow), attempts: attempts.map(attemptRow), exams: exams.map(examRow) }; }
+export async function backup() { const [questions, attempts, exams, preferences] = await Promise.all([allRows('questions', true), allRows('attempts'), allRows('exams'), loadSettings()]); return { schemaVersion: 2, ...preferences, exportedAt: new Date().toISOString(), questions: questions.map(fromRow), attempts: attempts.map(attemptRow), exams: exams.map(examRow) }; }
+
+export async function loadSettings(): Promise<{ categories: UserCategory[]; settings: UserSettings }> {
+  const [rows, settings] = await Promise.all([allRows('user_categories'), db().from('user_settings').select('font_id').maybeSingle()]);
+  return { categories: rows.map(row => ({ name: row.name, createdAt: row.created_at })).sort((a,b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name)), settings: { fontId: check(settings)?.font_id || 'default' } };
+}
+export async function addCategory(name: string) { check(await db().from('user_categories').insert({name: name.trim()})); }
+export async function renameCategory(name: string, nextName: string) { check(await db().from('user_categories').update({name: nextName.trim()}).eq('name',name)); }
+export async function removeCategory(name: string, replacement: string | null) { check(await db().rpc('remove_category',{p_name:name,p_replacement:replacement})); }
+export async function saveFont(fontId: string) {
+  const {data,error}=await db().auth.getUser(); if(error)throw new Error(error.message); const user=data.user;
+  if(!user) throw new Error('로그인이 필요합니다.');
+  check(await db().from('user_settings').upsert({user_id:user.id,font_id:fontId}));
+}
