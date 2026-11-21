@@ -29,6 +29,8 @@ npm run dev
 
 ## 무료 인프라 구성
 
+현재 프로젝트는 서울 리전의 `retry-note` (`unrcmkioyoldyadrfkze`)이며, 최초 데이터베이스 마이그레이션을 적용했습니다. GitHub OAuth 앱과 Auth의 URL 설정은 별도로 완료해야 실제 로그인이 가능합니다. 공개 프런트엔드에는 publishable key만 사용합니다.
+
 화면은 GitHub Pages, 인증·PostgreSQL 데이터는 Supabase Free를 사용합니다. 사용자 문제·답안·로그인 토큰은 이 저장소에 커밋하지 않습니다. Supabase 무료 서비스의 용량·휴면 정책은 제공자의 현재 정책을 따릅니다.
 
 ### 최초 Supabase 설정
