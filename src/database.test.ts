@@ -74,3 +74,31 @@ describe('사용자별 과목과 앱 설정',()=>{
   expect((await pg.query<{font_id:string}>('select font_id from public.user_settings')).rows[0].font_id).toBe('noonnu-1977');
  });
 });
+
+describe('초대한 참여자끼리만 공유하는 유튜브 방',()=>{
+ it('방 코드를 가진 사용자가 참여한 뒤 공유 상태를 읽고 조작할 수 있다',async()=>{
+  const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);expect(created.memberCount).toBe(1);
+  await asUser(B);expect((await pg.query('select * from public.watch_rooms')).rows).toHaveLength(0);await expect(call('public.watch_get($1)',[created.room.id])).rejects.toThrow('먼저 참여');
+  const joined=await call('public.watch_join($1)',[created.room.id]);expect(joined.memberCount).toBe(2);expect((await pg.query('select * from public.questions')).rows).toHaveLength(0);
+  const playing=await call('public.watch_update($1,$2,30,true,1,0)',[created.room.id,'M7lc1UVf-VE']);expect(playing.room.playing).toBe(true);expect(playing.room.version).toBe(1);
+  await asUser(A);const latest=await call('public.watch_get($1)',[created.room.id]);expect(latest.room.position).toBe(30);
+  const paused=await call('public.watch_update($1,$2,45,false,1,1)',[created.room.id,'M7lc1UVf-VE']);expect(paused.room.playing).toBe(false);expect(paused.room.position).toBe(45);
+ });
+ it('뒤늦게 들어온 조작이 더 최신 상태를 덮어쓰지 않는다',async()=>{
+  const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);const first=await call('public.watch_update($1,$2,60,true,1,0)',[created.room.id,'M7lc1UVf-VE']);
+  const stale=await call('public.watch_update($1,$2,10,false,1,0)',[created.room.id,'M7lc1UVf-VE']);expect(first.applied).toBe(true);expect(stale.applied).toBe(false);expect(stale.room.position).toBe(60);expect(stale.room.playing).toBe(true);
+ });
+ it('미참여자의 상태 변경과 직접 DB 조작을 차단한다',async()=>{
+  const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);await asUser(B);await expect(call('public.watch_update($1,$2,60,true,1,0)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('먼저 참여');
+  await expect(pg.query('update public.watch_rooms set playing=true where id=$1',[created.room.id])).rejects.toThrow();await expect(pg.query('insert into public.watch_members(room_id,user_id) values($1,$2)',[created.room.id,B])).rejects.toThrow();
+ });
+ it('나간 참여자는 방을 볼 수 없고 방 종료는 만든 사람만 할 수 있다',async()=>{
+  const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);await asUser(B);await call('public.watch_join($1)',[created.room.id]);await expect(call('public.watch_close($1)',[created.room.id])).rejects.toThrow('만든 사용자');
+  await call('public.watch_leave($1)',[created.room.id]);await expect(call('public.watch_get($1)',[created.room.id])).rejects.toThrow('먼저 참여');await call('public.watch_join($1)',[created.room.id]);
+  await asUser(A);await call('public.watch_close($1)',[created.room.id]);await asUser(B);expect((await call('public.watch_get($1)',[created.room.id])).room.closed).toBe(true);await expect(call('public.watch_update($1,$2,0,true,1,1)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('종료된 방');await expect(call('public.watch_join($1)',[created.room.id])).rejects.toThrow('찾을 수');
+ });
+ it('잘못된 영상 ID·위치·재생 속도를 거부한다',async()=>{
+  await expect(call('public.watch_create($1)',['https://evil.example'])).rejects.toThrow();const created=await call('public.watch_create($1)',['M7lc1UVf-VE']);
+  await expect(call('public.watch_update($1,$2,-1,true,1,0)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('재생 상태');await expect(call('public.watch_update($1,$2,0,true,100,0)',[created.room.id,'M7lc1UVf-VE'])).rejects.toThrow('재생 상태');
+ });
+});

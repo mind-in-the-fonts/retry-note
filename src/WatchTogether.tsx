@@ -1,0 +1,61 @@
+import {useEffect,useRef,useState} from 'react';
+import {db} from './api';
+import * as api from './watch-api';
+import {getWatchInvite,roomCode,watchTime,youtubeId,type WatchRoom,type WatchSnapshot} from './watch-core';
+import {WatchSync} from './watch-sync';
+import {loadYouTube,youtubeError,type YouTubePlayer} from './youtube';
+const message=(error:unknown)=>error instanceof Error?error.message:'함께 보기 요청을 처리하지 못했습니다.';
+function rememberRoom(id:string|null){const url=new URL(location.href);if(id)url.searchParams.set('room',id);else url.searchParams.delete('room');history.replaceState(null,'',url);try{sessionStorage.removeItem('retry-note-room-invite');}catch{/* Storage is optional for invitations. */}}
+export function WatchTogether({userId}:{userId:string}){
+ const [rooms,setRooms]=useState<WatchRoom[]>([]);const [active,setActive]=useState<WatchSnapshot|null>(null);const [url,setUrl]=useState('');const [code,setCode]=useState(getWatchInvite()||'');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+ const mounted=useRef(false);
+ useEffect(()=>{mounted.current=true;let live=true;const invite=getWatchInvite();setBusy(true);void (async()=>{try{const rooms=await api.listRooms();if(live)setRooms(rooms);if(invite){const snapshot=await api.joinRoom(invite);if(live){setActive(snapshot);rememberRoom(snapshot.room.id);}}}catch(error){if(live)setError(message(error));}finally{if(live)setBusy(false);}})();return()=>{live=false;mounted.current=false;};},[]);
+ async function run(action:()=>Promise<void>){if(busy)return;setBusy(true);setError('');try{await action();}catch(error){if(mounted.current)setError(message(error));}finally{if(mounted.current)setBusy(false);}}
+ async function enter(id:string){const snapshot=await api.joinRoom(id);if(mounted.current){setActive(snapshot);rememberRoom(snapshot.room.id);}}
+ if(active)return <WatchSession key={active.room.id} initial={active} userId={userId} onLeave={async()=>{await api.leaveRoom(active.room.id);rememberRoom(null);if(mounted.current){setActive(null);setCode('');setRooms(await api.listRooms());}}}/>;
+ return <><div className="page-heading"><div><span className="eyebrow">WATCH TOGETHER</span><h1>같이 보기</h1><p>같은 영상을 같은 순간에. 재생과 일시정지를 함께 맞춰요.</p></div></div>{error&&<p className="error" role="alert">{error}</p>}
+ <div className="watch-lobby"><section className="settings-card"><span className="watch-icon" aria-hidden="true">▷</span><h2>새 방 만들기</h2><p className="muted">함께 보고 싶은 유튜브 영상 URL을 넣어주세요.</p><form onSubmit={event=>{event.preventDefault();void run(async()=>{const snapshot=await api.createRoom(youtubeId(url));if(mounted.current){setActive(snapshot);rememberRoom(snapshot.room.id);}});}}><label htmlFor="watch-url">유튜브 URL</label><input id="watch-url" type="url" required placeholder="https://www.youtube.com/watch?v=…" value={url} onChange={event=>setUrl(event.target.value)} disabled={busy}/><button className="btn primary" disabled={busy||!url.trim()}>{busy?'연결 중':'방 만들기'}</button></form></section>
+ <section className="settings-card"><span className="watch-icon" aria-hidden="true">◎</span><h2>친구 방에 참여하기</h2><p className="muted">친구가 보낸 초대 링크나 방 코드를 붙여넣어주세요.</p><form onSubmit={event=>{event.preventDefault();void run(()=>enter(roomCode(code)));}}><label htmlFor="watch-code">초대 링크 또는 방 코드</label><input id="watch-code" required placeholder="초대 링크 또는 방 코드" value={code} onChange={event=>setCode(event.target.value)} disabled={busy}/><button className="btn secondary" disabled={busy||!code.trim()}>방 참여하기</button></form></section></div>
+ {!!rooms.length&&<section className="settings-card"><h2>참여한 방</h2><div className="watch-room-list">{rooms.map(room=><button className="watch-room-item" disabled={busy} key={room.id} onClick={()=>void run(()=>enter(room.id))}><span><strong>{room.owner_id===userId?'내가 만든 방':'참여 중인 방'}</strong><small>{room.video_id} · {room.playing?'재생 중':'일시정지'}</small></span><span>입장</span></button>)}</div></section>}
+ </>;
+}
+function WatchSession({initial,userId,onLeave}:{initial:WatchSnapshot;userId:string;onLeave:()=>Promise<void>}){
+ const [snapshot,setSnapshot]=useState(initial);const [sending,setSending]=useState(false);const [ready,setReady]=useState(false);const [enabled,setEnabled]=useState(false);const [connection,setConnection]=useState('실시간 연결 중');const [error,setError]=useState('');const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);const [url,setUrl]=useState('');const [position,setPosition]=useState(0);const [duration,setDuration]=useState(0);const [drag,setDrag]=useState<number|null>(null);const [showClose,setShowClose]=useState(false);const [showCode,setShowCode]=useState(false);
+ const host=useRef<HTMLDivElement>(null);const sync=useRef<WatchSync|null>(null);const latest=useRef(initial);const mounted=useRef(false);
+ function accept(next:WatchSnapshot,started?:number,finished?:number){if(next.room.version<latest.current.room.version)return;latest.current=next;if(sync.current)sync.current.accept(next,started,finished);else if(mounted.current)setSnapshot(next);}
+ useEffect(()=>{
+  mounted.current=true;let live=true;let player:YouTubePlayer|null=null;
+  void loadYouTube().then(YT=>{if(!live||!host.current)return;const element=document.createElement('div');host.current.append(element);
+   player=new YT.Player(element,{videoId:initial.room.video_id,width:'100%',height:'100%',playerVars:{playsinline:1,controls:1,origin:location.origin,enablejsapi:1,rel:0},events:{
+    onReady:event=>{if(!live)return;sync.current=new WatchSync(event.target,latest.current,{publish:api.updateRoom,onSnapshot:next=>{latest.current=next;if(live)setSnapshot(next);},onError:error=>{if(live)setError(error);},onEnabled:value=>{if(live)setEnabled(value);},onPending:value=>{if(live)setSending(value);}});setReady(true);},
+    onStateChange:event=>sync.current?.onState(event.data),onPlaybackRateChange:event=>sync.current?.onRate(event.data),
+    onAutoplayBlocked:()=>sync.current?.autoplayBlocked(),onError:event=>{if(live){setError(youtubeError(event.data));sync.current?.autoplayBlocked();}}
+   }});
+  }).catch(error=>{if(live)setError(message(error));});
+  const ticker=setInterval(()=>{const state=sync.current?.tick();if(live&&state){setPosition(state.position);setDuration(state.duration);}},250);
+  return()=>{live=false;mounted.current=false;clearInterval(ticker);sync.current?.dispose();sync.current=null;player?.destroy();host.current?.replaceChildren();};
+ },[initial.room.id]);
+ useEffect(()=>{
+  let live=true;let fetching=false;
+  async function refresh(){if(fetching)return;fetching=true;const started=Date.now();try{const next=await api.getRoom(initial.room.id);if(live)accept(next,started,Date.now());}catch(error){if(live)setError(message(error));}finally{fetching=false;}}
+  const channel=db().channel('watch-room-'+initial.room.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'watch_rooms',filter:'id=eq.'+initial.room.id},event=>{if(live)accept({...latest.current,room:event.new as WatchRoom});}).subscribe(status=>{if(!live)return;setConnection(status==='SUBSCRIBED'?'실시간 동기화 연결됨':'주기적으로 동기화 중 · 실시간 연결 복구 중');if(status==='SUBSCRIBED')void refresh();});
+  void refresh();const polling=setInterval(()=>void refresh(),5000);const focus=()=>{if(!document.hidden)void refresh();};document.addEventListener('visibilitychange',focus);window.addEventListener('online',focus);
+  return()=>{live=false;clearInterval(polling);document.removeEventListener('visibilitychange',focus);window.removeEventListener('online',focus);void db().removeChannel(channel);};
+ },[initial.room.id]);
+ async function run(action:()=>Promise<void>){if(busy)return;setBusy(true);setError('');try{await action();}catch(error){if(mounted.current)setError(message(error));}finally{if(mounted.current)setBusy(false);}}
+ const room=snapshot.room;const invite=new URL(import.meta.env.BASE_URL,location.origin);invite.searchParams.set('room',room.id);
+ async function copyInvite(){try{await navigator.clipboard.writeText(invite.href);setNotice('초대 링크를 복사했습니다. 친구에게 보내주세요.');}catch{setShowCode(true);setNotice('아래 초대 링크를 선택해 복사해주세요.');}}
+ function seek(value:number){setDrag(null);sync.current?.seek(value);}
+ return <><div className="page-heading"><div><span className="eyebrow">WATCH TOGETHER</span><h1>같이 보기</h1><p>참여자 누구나 재생·일시정지·영상 위치를 바꿀 수 있어요.</p></div><button className="btn secondary" onClick={copyInvite} disabled={room.closed}>초대 링크 복사</button></div>
+ <div className="watch-status" role="status"><span>{connection}</span><span>참여 계정 {snapshot.memberCount}명</span></div>{notice&&<p className="settings-notice" role="status">{notice}</p>}{error&&<p className="error" role="alert">{error}</p>}
+ {room.closed&&<div className="error" role="status">방이 종료됐습니다. 나간 뒤 새 방을 만들거나 다른 방에 참여해주세요.</div>}
+ <section className="watch-card"><div className="watch-player" ref={host}/>{!ready&&!error&&<p className="watch-loading">유튜브 플레이어를 불러오는 중입니다.</p>}
+ {!enabled&&!room.closed&&<div className="watch-activation"><div><strong>이 기기에서 시청을 시작해주세요.</strong><p>브라우저의 자동재생 제한을 해제한 뒤 함께 재생합니다.</p></div><button className="btn primary" disabled={!ready||busy||sending} onClick={()=>sync.current?.start()}>시청 시작</button></div>}
+ <div className="watch-controls"><div className="watch-control-buttons"><button className="btn primary" disabled={!ready||room.closed||busy||sending} onClick={()=>sync.current?.toggle()}>{sending?'상태 공유 중':room.playing?'함께 일시정지':'함께 재생'}</button><button className="btn secondary" disabled={!ready||room.closed||sending} onClick={()=>sync.current?.seek(position-10)}>10초 이전</button><button className="btn secondary" disabled={!ready||room.closed||sending} onClick={()=>sync.current?.seek(position+10)}>10초 이후</button><span className="watch-time">{watchTime(drag??position)} / {watchTime(duration)}</span></div><input aria-label="함께 볼 영상 위치" className="watch-seek" type="range" min="0" max={duration||1} step="0.1" value={Math.min(drag??position,duration||1)} disabled={!ready||!duration||room.closed||sending} onChange={event=>setDrag(Number(event.target.value))} onPointerUp={event=>seek(Number(event.currentTarget.value))} onKeyUp={event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))seek(Number(event.currentTarget.value));}} onBlur={event=>{if(drag!==null)seek(Number(event.currentTarget.value));}}/>
+ <p className="watch-help">볼륨과 자막은 각자 설정합니다. 광고·버퍼링은 기기마다 다를 수 있습니다. 연결이 복구되면 공유 위치에 다시 맞춥니다.</p></div></section>
+ <section className="settings-card watch-video-form"><h2>함께 볼 영상 바꾸기</h2><form onSubmit={event=>{event.preventDefault();if(!ready||sending||room.closed)return;setError('');try{sync.current?.changeVideo(youtubeId(url));setUrl('');}catch(error){setError(message(error));}}}><label className="sr-only" htmlFor="watch-next-url">새 유튜브 URL</label><input id="watch-next-url" type="url" required value={url} disabled={!ready||room.closed||sending} onChange={event=>setUrl(event.target.value)} placeholder="새 유튜브 영상 URL"/><button className="btn secondary" disabled={!ready||!url.trim()||room.closed||sending}>영상 변경</button></form></section>
+ <section className="watch-room-footer"><button className="text-btn" onClick={()=>setShowCode(old=>!old)}>{showCode?'방 코드 접기':'방 코드 보기'}</button><div className="button-row"><button className="btn secondary" disabled={busy} onClick={()=>void run(onLeave)}>방 나가기</button>{room.owner_id===userId&&!room.closed&&<button className="text-btn text-danger" disabled={busy} onClick={()=>setShowClose(true)}>방 종료</button>}</div></section>
+ {showCode&&<div className="settings-card"><label htmlFor="watch-invite">초대 링크</label><input id="watch-invite" className="watch-copy" readOnly value={invite.href} onFocus={event=>event.target.select()}/><p className="watch-code">방 코드: {room.id}</p></div>}
+ {showClose&&<div className="category-remove"><strong>모든 참여자의 시청을 종료할까요?</strong><div className="button-row"><button className="btn secondary" disabled={busy} onClick={()=>setShowClose(false)}>취소</button><button className="btn danger" disabled={busy} onClick={()=>void run(async()=>{await api.closeRoom(room.id);setShowClose(false);const next=await api.getRoom(room.id);accept(next);})}>방 종료하기</button></div></div>}
+ </>;
+}
