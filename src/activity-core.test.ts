@@ -1,0 +1,2 @@
+import {expect,it} from 'vitest';import {activityDateRange} from './activity-core';
+it('한국 날짜 전체를 포함하는 UTC 경계를 만들고 잘못된 날짜를 거부한다',()=>{expect(activityDateRange('2026-11-22','2026-11-22')).toEqual({from:'2026-11-21T15:00:00.000Z',to:'2026-11-22T15:00:00.000Z'});expect(activityDateRange('','')).toEqual({from:null,to:null});expect(()=>activityDateRange('2026-02-30','')).toThrow();expect(()=>activityDateRange('2026-11-23','2026-11-22')).toThrow('시작 날짜');});

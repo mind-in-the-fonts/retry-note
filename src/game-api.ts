@@ -17,3 +17,7 @@ export const pomoGoal=(room:string,cycle:number,goal:string)=>rpc<void>('pomo_go
 export const pomoHeartbeat=(room:string,position:number,active:boolean)=>rpc<PomoProgress[]>('pomo_heartbeat',{p_room:room,p_position:position,p_active:active});
 export const pomoClaim=(room:string,cycle:number)=>rpc<Reward|null>('pomo_claim',{p_room:room,p_cycle:cycle,p_confirm:true});
 export function announceReward(reward:Reward|null){if(reward)window.dispatchEvent(new CustomEvent('study-reward',{detail:reward}));}
+export type ActivityKind='all'|'quiz'|'pomodoro'|'purchase';
+export interface ActivityEntry {id:string;kind:Exclude<ActivityKind,'all'>;title:string;details:{category?:string;question?:string;page?:string;questionNumber?:string;correct?:boolean;videoId?:string;cycle?:number;goal?:string;focusSeconds?:number;itemId?:string;itemName?:string;legacy?:boolean};amount:number|null;base:number;random_bonus:number;correct_bonus:number;minutes:number;occurred_at:string}
+export interface ActivityPage {entries:ActivityEntry[];hasMore:boolean;summary:{count:number;earned:number;spent:number;unknownPurchases:number;balance:number}}
+export async function activityLog(filters:{kind:ActivityKind;search:string;from:string|null;to:string|null},cursor?:ActivityEntry):Promise<ActivityPage>{return rpc('game_activity',{p_kind:filters.kind,p_search:filters.search,p_from:filters.from,p_to:filters.to,p_before_time:cursor?.occurred_at||null,p_before_id:cursor?.id||null,p_limit:40});}

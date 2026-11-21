@@ -147,3 +147,32 @@ describe('뽀모도로 완료 확인과 참여 시간',()=>{
   const one=await call('public.pomo_create($1)',['pts1U6XuXlA']);const two=await call('public.pomo_create($1)',['pts1U6XuXlA']);await call('public.watch_update($1,$2,0,true,1,0)',[one.room.id,'pts1U6XuXlA']);await call('public.watch_update($1,$2,0,true,1,0)',[two.room.id,'pts1U6XuXlA']);await call('public.pomo_heartbeat($1,0,true)',[one.room.id]);await call('public.pomo_heartbeat($1,0,true)',[two.room.id]);await pg.exec(`reset role; update public.watch_rooms set updated_at=clock_timestamp()-interval '30 seconds'; update game_private.presence set last_at=clock_timestamp()-interval '30 seconds';`);await asUser(A);const data=await call('public.pomo_heartbeat($1,30,true)',[one.room.id]);expect(data).toHaveLength(0);
  });
 });
+
+describe('공부 보상·상점 활동 기록',()=>{
+ it('보상 시점의 과목·책 페이지·문제를 보관하고 나중 수정에 영향받지 않는다',async()=>{
+  const ex=await call('public.start_exam($1,0)',[['프로그래밍언어론']]);await call('public.submit_answer($1,0,1)',[ex.id]);await pg.query('update public.questions set stem=$1,page=$2 where id=$3',['바뀐 내용','999',Q1]);await pg.exec("update public.user_categories set name='바뀐 과목' where name='프로그래밍언어론'");
+  const log=await call('public.game_activity()');expect(log.entries).toHaveLength(1);expect(log.entries[0].title).toBe('프로그래밍언어론');expect(log.entries[0].details.question).toBe('문제 A');expect(log.entries[0].details.page).toBe('721');expect(log.entries[0].details.correct).toBe(true);expect(log.summary.earned).toBe(log.entries[0].amount);
+ });
+ it('구매와 결제를 함께 기록하고 중복 구매·가격 변경에도 당시 가격과 이름을 유지한다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=10000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['mug']);await call('public.game_buy($1)',['mug']);
+  await pg.exec("reset role;update public.game_items set price=999,name='바뀐 이름' where id='mug'");await asUser(A);const log=await call('public.game_activity($1)',['purchase']);expect(log.entries).toHaveLength(1);expect(log.entries[0].amount).toBe(-400);expect(log.entries[0].title).toBe('따뜻한 머그잔');expect(log.summary.spent).toBe(400);expect(log.summary.balance).toBe(9600);
+  await pg.exec("reset role;update public.game_items set price=400,name='따뜻한 머그잔' where id='mug'");
+ });
+ it('뽀모도로 보상에는 영상·회차·집중 시간·당시 목표를 남긴다',async()=>{
+  const made=await call('public.pomo_create($1)',['pts1U6XuXlA']);await call('public.pomo_goal($1,0,$2)',[made.room.id,'한국사 근현대 10쪽']);await pg.exec(`reset role;update public.pomodoro_progress set focus_seconds=600,completed_at=now() where user_id='${A}' and room_id='${made.room.id}'`);await asUser(A);await call('public.pomo_claim($1,0,true)',[made.room.id]);await call('public.pomo_goal($1,0,$2)',[made.room.id,'나중 수정한 목표']);
+  const log=await call('public.game_activity($1)',['pomodoro']);expect(log.entries[0].details.goal).toBe('한국사 근현대 10쪽');expect(log.entries[0].details.cycle).toBe(1);expect(log.entries[0].minutes).toBe(10);expect(log.entries[0].details.videoId).toBe('pts1U6XuXlA');
+ });
+ it('종류·검색·날짜 경계와 커서 페이지를 적용하면서 누락·중복 없이 조회한다',async()=>{
+  for(const category of ['프로그래밍언어론','데이터베이스론']){const ex=await call('public.start_exam($1,0)',[[category]]);await call('public.submit_answer($1,0,0)',[ex.id]);}
+  await pg.exec(`reset role;update public.game_wallets set coins=10000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['mug']);
+  const first=await call('public.game_activity($1,$2,null,null,null,null,1)',['all','']);expect(first.entries).toHaveLength(1);expect(first.hasMore).toBe(true);expect(first.summary.count).toBe(3);
+  const second=await call('public.game_activity($1,$2,null,null,$3,$4,1)',['all','',first.entries[0].occurred_at,first.entries[0].id]);const third=await call('public.game_activity($1,$2,null,null,$3,$4,1)',['all','',second.entries[0].occurred_at,second.entries[0].id]);expect(new Set([...first.entries,...second.entries,...third.entries].map(row=>row.id)).size).toBe(3);expect(third.hasMore).toBe(false);
+  expect((await call('public.game_activity($1)',['quiz'])).entries).toHaveLength(2);expect((await call('public.game_activity($1,$2)',['all','데이터베이스'])).entries).toHaveLength(1);
+  const before=await call('public.game_activity($1,$2,null,$3)',['all','',first.entries[0].occurred_at]);expect(before.entries.some((row:{id:string})=>row.id===first.entries[0].id)).toBe(false);
+ });
+ it('다른 계정의 원장은 조회할 수 없으며 구매 기록 위조·삭제를 막는다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=10000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['mug']);await expect(pg.exec('delete from public.game_purchases')).rejects.toThrow();await asUser(B);
+  expect((await pg.query('select * from public.game_activity_log')).rows).toHaveLength(0);expect((await call('public.game_activity()')).summary.count).toBe(0);await expect(pg.query("insert into public.game_purchases(user_id,item_id,item_name,price) values($1,'bed','침대',1)",[B])).rejects.toThrow();
+ });
+ it('무제한 조회나 잘못된 필터 요청을 거부한다',async()=>{await expect(call('public.game_activity($1)',['other'])).rejects.toThrow('조회 조건');await expect(call('public.game_activity($1,$2,null,null,null,null,10000)',['all',''])).rejects.toThrow('조회 조건');});
+});
