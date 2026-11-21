@@ -10,7 +10,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "build:pages": "tsc --noEmit && vite build --base=/retry-note/ --outDir docs",
     "build:cloudflare": "tsc --noEmit && vite build --base=/ --outDir dist",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist --project-name retry-note --branch main"
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist --project-name retry-note --branch main --force"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",

@@ -53,11 +53,11 @@ npm run dev
 
 ```sh
 npx wrangler login
-npx wrangler pages project create retry-note --production-branch main
+npx wrangler pages project create retry-note --production-branch main --force
 npm run deploy:cloudflare
 ```
 
-최초 프로젝트 생성은 한 번만 실행합니다. 로그인 토큰과 `.env.local`은 저장소에 올리지 않습니다. 이후 배포에는 `npm run deploy:cloudflare`를 사용합니다. 새 주소를 게시한 뒤 Supabase Auth의 Site URL과 Redirect URLs에도 실제 주소를 등록해야 로그인이 새 사이트로 돌아옵니다. GitHub OAuth 앱의 callback URL은 Supabase 주소이므로 변경하지 않습니다. 기존 GitHub Pages 주소는 별도로 유지됩니다.
+최초 프로젝트 생성은 한 번만 실행합니다. `--force`는 Wrangler의 Workers 전환 대신 `pages.dev`를 사용하는 Pages 배포를 선택하는 옵션입니다. 로그인 토큰과 `.env.local`은 저장소에 올리지 않습니다. 이후 배포에는 `npm run deploy:cloudflare`를 사용합니다. 새 주소를 게시한 뒤 Supabase Auth의 Site URL과 Redirect URLs에도 실제 주소를 등록해야 로그인이 새 사이트로 돌아옵니다. GitHub OAuth 앱의 callback URL은 Supabase 주소이므로 변경하지 않습니다. 기존 GitHub Pages 주소는 별도로 유지됩니다.
 
 ### GitHub Pages
 
