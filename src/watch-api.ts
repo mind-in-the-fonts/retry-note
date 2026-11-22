@@ -13,3 +13,4 @@ export async function renameRoom(id:string,name:string):Promise<WatchSnapshot>{r
 
 export async function createClock(video:string,name:string,focus:number,rest:number,pause:boolean):Promise<WatchSnapshot>{return checked(await db().rpc('pomo_create_clock',{p_video:video,p_name:name,p_focus:focus*60,p_rest:rest*60,p_pause:pause}).abortSignal(AbortSignal.timeout(12000)));}
 export async function controlTimer(room:WatchRoom,running:boolean):Promise<WatchSnapshot>{return checked(await db().rpc('pomo_timer',{p_id:room.id,p_running:running,p_version:room.version}).abortSignal(AbortSignal.timeout(12000)));}
+export async function changePomodoroVideo(room:WatchRoom,video:string):Promise<WatchSnapshot>{return checked(await db().rpc('pomo_change_video',{p_room:room.id,p_video:video,p_version:room.version}).abortSignal(AbortSignal.timeout(12000)));}

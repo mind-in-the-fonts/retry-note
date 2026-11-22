@@ -277,3 +277,28 @@ describe('사용자 영상과 독립적인 공부방 공통 타이머',()=>{
   await asUser(B);await expect(call('public.pomo_heartbeat($1,0,true)',[made.room.id])).rejects.toThrow('먼저 참여');await pg.exec('reset role;set role anon;');await expect(call('public.pomo_create_clock($1,$2,120,60,false)',['dQw4w9WgXcQ','bad'])).rejects.toThrow();
  });
 });
+
+describe('뽀모도로 도중 공유 영상 변경',()=>{
+ it('추천 영상도 다른 URL로 바꾸며 회차·남은 집중 시간·두 사용자의 공부와 목표를 보존한다',async()=>{
+  const made=await call('public.pomo_create($1)',['7de9NZVQEx0']);let snap=await call('public.watch_update($1,$2,120,true,1,$3)',[made.room.id,'7de9NZVQEx0',made.room.version]);
+  await call('public.pomo_goal($1,0,$2)',[made.room.id,'DB 복습']);await call('public.pomo_heartbeat($1,120,true)',[made.room.id]);await asUser(B);await call('public.watch_join($1)',[made.room.id]);await call('public.pomo_heartbeat($1,120,true)',[made.room.id]);
+  await pg.exec(`reset role;update public.pomodoro_progress set focus_seconds=100 where room_id='${made.room.id}';update game_private.presence set last_at=clock_timestamp()-interval '15 seconds',last_position=105 where room_id='${made.room.id}';`);await asUser(B);
+  snap=await call('public.pomo_change_video($1,$2,$3)',[made.room.id,'dQw4w9WgXcQ',snap.room.version]);expect(snap.room.timer_kind).toBe('clock');expect(snap.room.video_id).toBe('dQw4w9WgXcQ');expect(snap.room.position).toBe(0);expect(snap.room.timer_running).toBe(true);const first=(await pg.query<{sessions:any[]}>('select sessions from public.pomodoro_catalog where video_id=$1',['7de9NZVQEx0'])).rows[0].sessions[0];expect(snap.room.timer_elapsed).toBeCloseTo(120-first.start,0);expect(snap.room.focus_seconds).toBe(first.end-first.start);
+  await asUser(A);const progress=await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);expect(progress[0].goal).toBe('DB 복습');expect(progress[0].focus_seconds).toBeGreaterThanOrEqual(114);await asUser(B);expect((await call('public.pomo_heartbeat($1,0,true)',[made.room.id]))[0].focus_seconds).toBeGreaterThanOrEqual(14);
+ });
+ it('휴식 중 변경해도 남은 휴식 시간을 보존하고 기존 완료 보상을 한 번만 받는다',async()=>{
+  const made=await call('public.pomo_create($1)',['7de9NZVQEx0']);let snap=await call('public.watch_update($1,$2,2432,false,1,$3)',[made.room.id,'7de9NZVQEx0',made.room.version]);await call('public.pomo_goal($1,0,$2)',[made.room.id,'첫 회차']);await pg.exec(`reset role;update public.pomodoro_progress set focus_seconds=2400 where room_id='${made.room.id}'`);await asUser(A);
+  snap=await call('public.pomo_change_video($1,$2,$3)',[made.room.id,'M7lc1UVf-VE',snap.room.version]);const source=(await pg.query<{sessions:any[]}>('select sessions from public.pomodoro_catalog where video_id=$1',['7de9NZVQEx0'])).rows[0].sessions;
+  expect(snap.room.timer_elapsed-snap.room.focus_seconds).toBeCloseTo(30,0);expect(snap.room.focus_seconds+snap.room.rest_seconds-snap.room.timer_elapsed).toBeCloseTo(source[1].start-2432,0);
+  const reward=await call('public.pomo_claim($1,0,true)',[made.room.id]);expect(reward.minutes).toBe(40);expect(await call('public.pomo_claim($1,0,true)',[made.room.id])).toBeNull();
+ });
+ it('자유 타이머 방의 영상을 여러 번 바꿔도 공통 시간·길이·일시정지 상태를 바꾸지 않는다',async()=>{
+  let snap=await call('public.pomo_create_clock($1,$2,3000,600,true)',['dQw4w9WgXcQ','영상 교체']);snap=await call('public.pomo_timer($1,true,$2)',[snap.room.id,snap.room.version]);const before=snap.room;
+  for(const video of ['M7lc1UVf-VE','pts1U6XuXlA']){snap=await call('public.pomo_change_video($1,$2,$3)',[before.id,video,snap.room.version]);expect(snap.room.timer_updated_at).toBe(before.timer_updated_at);expect(snap.room.timer_elapsed).toBe(before.timer_elapsed);expect(snap.room.timer_running).toBe(true);expect(snap.room.pause_during_rest).toBe(true);expect(snap.room.focus_seconds).toBe(3000);}
+ });
+ it('미참여자·종료된 방·잘못된 URL을 차단하고 늦게 온 변경은 덮어쓰지 않는다',async()=>{
+  const made=await call('public.pomo_create($1)',['7de9NZVQEx0']);await asUser(B);await expect(call('public.pomo_change_video($1,$2,$3)',[made.room.id,'dQw4w9WgXcQ',made.room.version])).rejects.toThrow('먼저 참여');await asUser(A);
+  await expect(call('public.pomo_change_video($1,$2,$3)',[made.room.id,'invalid',made.room.version])).rejects.toThrow('영상 주소');const changed=await call('public.pomo_change_video($1,$2,$3)',[made.room.id,'dQw4w9WgXcQ',made.room.version]);const stale=await call('public.pomo_change_video($1,$2,$3)',[made.room.id,'M7lc1UVf-VE',made.room.version]);expect(stale.applied).toBe(false);expect(stale.room.video_id).toBe(changed.room.video_id);
+  await call('public.watch_close($1)',[made.room.id]);await expect(call('public.pomo_change_video($1,$2,$3)',[made.room.id,'M7lc1UVf-VE',changed.room.version])).rejects.toThrow('열린');
+ });
+});
