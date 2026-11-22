@@ -1,4 +1,5 @@
 export interface WatchRoom {
+ timer_kind?:'video'|'clock';focus_seconds?:number;rest_seconds?:number;pause_during_rest?:boolean;timer_elapsed?:number;timer_running?:boolean;timer_updated_at?:string|null;
  mode?:'watch'|'pomodoro';name?:string;id:string;owner_id:string;video_id:string;position:number;playing:boolean;playback_rate:number;version:number;updated_at:string;updated_by:string|null;closed:boolean;created_at:string;
 }
 export interface WatchSnapshot {room:WatchRoom;serverNow:string;memberCount:number;members?:{id:string;name:string;character:string}[];applied?:boolean}

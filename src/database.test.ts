@@ -237,3 +237,43 @@ describe('시즌별 캐릭터 컬렉션 추가',()=>{
  it('베이비·파자마·인어섬·벚꽃 23종이 기존 컬렉션을 보존하며 등록된다',async()=>{const rows=(await pg.query<{character_id:string;total:number}>("select character_id,count(*)::integer total from public.game_items where kind='appearance' group by character_id order by character_id")).rows;expect(Object.fromEntries(rows.map(r=>[r.character_id,r.total]))).toEqual({anoko:1,furuhonya:4,hachiware:5,kurimanju:5,momonga:5,shisa:5,usagi:5});});
  it('새 컬렉션을 구매·적용·재적용해도 한 번만 차감하고 친구 방에 같은 모습으로 남긴다',async()=>{await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=10000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['sakura-furuhonya']);await call('public.game_appearance($1)',['sakura-furuhonya']);await call('public.game_buy($1)',['sakura-furuhonya']);const state=await call('public.game_state()');expect(state.wallet.coins).toBe(6500);expect(state.wallet.character).toBe('furuhonya');expect(state.wallet.appearance_id).toBe('sakura-furuhonya');await asUser(B);expect((await call('public.game_visit($1)',[A])).appearance_id).toBe('sakura-furuhonya');await expect(call('public.game_appearance($1)',['sakura-furuhonya'])).rejects.toThrow('구매한');});
 });
+
+describe('사용자 영상과 독립적인 공부방 공통 타이머',()=>{
+ async function clock(focus=120,rest=60,pause=false){return call('public.pomo_create_clock($1,$2,$3,$4,$5)',['dQw4w9WgXcQ','친구 공부방',focus,rest,pause]);}
+ async function advance(room:string,seconds:number){await pg.query("reset role");await pg.query("update public.watch_rooms set timer_elapsed=timer_elapsed+$2,timer_updated_at=clock_timestamp() where id=$1",[room,seconds]);await pg.query("update game_private.presence set last_at=clock_timestamp()-($2||' seconds')::interval where room_id=$1",[room,seconds]);await asUser(A);}
+ it('임의의 영상으로 방을 만들고 기존 영상 방·초대·시간 제한을 보존한다',async()=>{
+  const made=await clock();expect(made.room.timer_kind).toBe('clock');expect(made.room.name).toBe('친구 공부방');expect(made.room.timer_running).toBe(false);
+  for(const args of [[0,60],[120,-1],[10801,60],[120,3601]])await expect(clock(...args as [number,number])).rejects.toThrow('시간');
+  const old=await call('public.watch_create($1)',['M7lc1UVf-VE']);await asUser(B);expect((await call('public.watch_join($1)',[old.room.id])).room.mode).toBe('watch');
+  await expect(call('public.pomo_timer($1,true,$2)',[made.room.id,made.room.version])).rejects.toThrow('만든 사용자');
+  await call('public.watch_join($1)',[made.room.id]);await expect(call('public.pomo_timer($1,true,$2)',[made.room.id,made.room.version])).rejects.toThrow('만든 사용자');
+ });
+ it('각자 다른 때 보상을 받아도 공통 시간은 그대로이며 다음 집중 회차가 시작된다',async()=>{
+  const made=await clock();let snap=await call('public.pomo_timer($1,true,$2)',[made.room.id,made.room.version]);await call('public.pomo_goal($1,0,$2)',[made.room.id,'수학 10문제']);await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);
+  await asUser(B);await call('public.watch_join($1)',[made.room.id]);await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);await asUser(A);
+  for(let i=0;i<3;i++){await advance(made.room.id,60);await call('public.pomo_heartbeat($1,999999,true)',[made.room.id]);await asUser(B);await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);await asUser(A);}
+  const before=(await call('public.watch_get($1)',[made.room.id])).room;expect(before.timer_elapsed).toBeGreaterThanOrEqual(180);
+  const reward=await call('public.pomo_claim($1,0,true)',[made.room.id]);expect(reward.minutes).toBe(2);expect(reward.details.goal).toBe('수학 10문제');expect(reward.details.title).toBe('친구 공부방');
+  await asUser(B);const other=(await call('public.watch_get($1)',[made.room.id])).room;expect(other.timer_updated_at).toBe(before.timer_updated_at);expect(other.timer_running).toBe(true);expect(other.timer_elapsed).toBe(before.timer_elapsed);
+  expect((await call('public.pomo_claim($1,0,true)',[made.room.id])).minutes).toBe(2);expect(await call('public.pomo_claim($1,0,true)',[made.room.id])).toBeNull();
+  const after=(await call('public.watch_get($1)',[made.room.id])).room;expect(after.version).toBe(before.version);expect(after.timer_updated_at).toBe(before.timer_updated_at);
+ });
+ it('영상 탐색·배속·일시정지는 공부 시간을 만들지 않으며 휴식·오프라인 공백을 제외한다',async()=>{
+  const made=await clock();let snap=await call('public.pomo_timer($1,true,$2)',[made.room.id,made.room.version]);await call('public.pomo_heartbeat($1,0,true)',[made.room.id]);
+  await call('public.watch_update($1,$2,50000,false,2,$3)',[made.room.id,'M7lc1UVf-VE',snap.room.version]);await call('public.pomo_heartbeat($1,50000,true)',[made.room.id]);await expect(call('public.pomo_claim($1,0,true)',[made.room.id])).rejects.toThrow('공부 구간');
+  await advance(made.room.id,60);await call('public.pomo_heartbeat($1,50000,true)',[made.room.id]);await advance(made.room.id,60);let progress=await call('public.pomo_heartbeat($1,50000,true)',[made.room.id]);expect(progress[0].focus_seconds).toBeCloseTo(120,0);
+  await advance(made.room.id,50);progress=await call('public.pomo_heartbeat($1,50000,true)',[made.room.id]);expect(progress[0].focus_seconds).toBeCloseTo(120,0);expect(progress.find((p:any)=>p.cycle===1)).toBeUndefined();
+  await advance(made.room.id,600);progress=await call('public.pomo_heartbeat($1,50000,true)',[made.room.id]);expect(progress.filter((p:any)=>p.cycle>0)).toHaveLength(0);
+ });
+ it('방장 일시정지·재개는 시간을 보존하고 휴식 중 영상 정지를 함께 동기화한다',async()=>{
+  const made=await clock(120,60,true);let snap=await call('public.pomo_timer($1,true,$2)',[made.room.id,made.room.version]);await advance(made.room.id,120);snap=await call('public.watch_get($1)',[made.room.id]);expect(snap.room.playing).toBe(false);
+  const paused=await call('public.pomo_timer($1,false,$2)',[made.room.id,snap.room.version]);expect(paused.room.timer_running).toBe(false);expect(paused.room.timer_elapsed).toBeGreaterThanOrEqual(120);
+  const stale=await call('public.pomo_timer($1,true,$2)',[made.room.id,snap.room.version]);expect(stale.applied).toBe(false);expect(stale.room.timer_running).toBe(false);
+  const resumed=await call('public.pomo_timer($1,true,$2)',[made.room.id,paused.room.version]);expect(resumed.room.playing).toBe(false);await advance(made.room.id,60);snap=await call('public.watch_get($1)',[made.room.id]);expect(snap.room.playing).toBe(true);
+  await call('public.watch_close($1)',[made.room.id]);snap=await call('public.watch_get($1)',[made.room.id]);expect(snap.room.timer_running).toBe(false);expect(snap.room.closed).toBe(true);
+ });
+ it('未완료·미래 보상과 미참여자 호출·타이머 직접 위조를 차단한다',async()=>{
+  const made=await clock();await expect(call('public.pomo_claim($1,999,true)',[made.room.id])).rejects.toThrow();await expect(pg.query('update public.watch_rooms set timer_elapsed=999999 where id=$1',[made.room.id])).rejects.toThrow();
+  await asUser(B);await expect(call('public.pomo_heartbeat($1,0,true)',[made.room.id])).rejects.toThrow('먼저 참여');await pg.exec('reset role;set role anon;');await expect(call('public.pomo_create_clock($1,$2,120,60,false)',['dQw4w9WgXcQ','bad'])).rejects.toThrow();
+ });
+});
