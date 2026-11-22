@@ -232,3 +232,8 @@ describe('봉제 굿즈를 참고한 캐릭터 일러스트 컬렉션',()=>{
   await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);for(const id of ['magical-anoko','mug'])await call('public.game_buy($1)',[id]);await expect(call('public.game_place($1,true,50,65)',['magical-anoko'])).rejects.toThrow('보유한');await expect(call('public.game_appearance($1)',['mug'])).rejects.toThrow('구매한');
  });
 });
+
+describe('시즌별 캐릭터 컬렉션 추가',()=>{
+ it('베이비·파자마·인어섬·벚꽃 23종이 기존 컬렉션을 보존하며 등록된다',async()=>{const rows=(await pg.query<{character_id:string;total:number}>("select character_id,count(*)::integer total from public.game_items where kind='appearance' group by character_id order by character_id")).rows;expect(Object.fromEntries(rows.map(r=>[r.character_id,r.total]))).toEqual({anoko:1,furuhonya:4,hachiware:5,kurimanju:5,momonga:5,shisa:5,usagi:5});});
+ it('새 컬렉션을 구매·적용·재적용해도 한 번만 차감하고 친구 방에 같은 모습으로 남긴다',async()=>{await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=10000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['sakura-furuhonya']);await call('public.game_appearance($1)',['sakura-furuhonya']);await call('public.game_buy($1)',['sakura-furuhonya']);const state=await call('public.game_state()');expect(state.wallet.coins).toBe(6500);expect(state.wallet.character).toBe('furuhonya');expect(state.wallet.appearance_id).toBe('sakura-furuhonya');await asUser(B);expect((await call('public.game_visit($1)',[A])).appearance_id).toBe('sakura-furuhonya');await expect(call('public.game_appearance($1)',['sakura-furuhonya'])).rejects.toThrow('구매한');});
+});

@@ -1,0 +1,26 @@
+-- Illustrated collection variants based on the verified full-body plush lineup.
+insert into public.game_items(id,name,price,kind,description,character_id) values
+('baby-hachiware','하치와레 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','hachiware'),
+('baby-usagi','우사기 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','usagi'),
+('baby-momonga','모몽가 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','momonga'),
+('baby-kurimanju','쿠리만쥬 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','kurimanju'),
+('baby-shisa','시사 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','shisa'),
+('baby-furuhonya','카니 · 베이비',3500,'appearance','아기옷과 턱받이의 베이비 모습','furuhonya'),
+('pajama-party-hachiware','하치와레 · 파자마 파티',3500,'appearance','흰 단추 두 개의 포근한 파자마 모습','hachiware'),
+('pajama-party-usagi','우사기 · 파자마 파티',3500,'appearance','흰 단추 두 개의 포근한 파자마 모습','usagi'),
+('pajama-party-momonga','모몽가 · 파자마 파티',3500,'appearance','흰 단추 두 개의 포근한 파자마 모습','momonga'),
+('pajama-party-kurimanju','쿠리만쥬 · 파자마 파티',3500,'appearance','흰 단추 두 개의 포근한 파자마 모습','kurimanju'),
+('pajama-party-shisa','시사 · 파자마 파티',3500,'appearance','흰 단추 두 개의 포근한 파자마 모습','shisa'),
+('mermaid-island-usagi','우사기 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','usagi'),
+('mermaid-island-hachiware','하치와레 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','hachiware'),
+('mermaid-island-momonga','모몽가 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','momonga'),
+('mermaid-island-kurimanju','쿠리만쥬 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','kurimanju'),
+('mermaid-island-shisa','시사 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','shisa'),
+('mermaid-island-furuhonya','카니 · 인어섬',3500,'appearance','캐릭터별 꽃관과 연두색 훌라 치마','furuhonya'),
+('sakura-usagi','우사기 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','usagi'),
+('sakura-hachiware','하치와레 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','hachiware'),
+('sakura-momonga','모몽가 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','momonga'),
+('sakura-kurimanju','쿠리만쥬 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','kurimanju'),
+('sakura-shisa','시사 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','shisa'),
+('sakura-furuhonya','카니 · 벚꽃',3500,'appearance','벚꽃 봉제 굿즈의 색과 표정을 살린 모습','furuhonya')
+on conflict(id) do nothing;

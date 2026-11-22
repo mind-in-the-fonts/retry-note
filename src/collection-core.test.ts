@@ -1,0 +1,10 @@
+import {expect,it} from 'vitest';import {SHOP_TABS,shopItems} from './collection-core';import type {Item} from './game-api';
+const items:Item[]=[{id:'momo',name:'모몽가 매지컬',price:3500,kind:'appearance',description:'',character_id:'momonga'},{id:'kani',name:'카니 매지컬',price:3500,kind:'appearance',description:'',character_id:'furuhonya'},{id:'kani-baby',name:'카니 베이비',price:3500,kind:'appearance',description:'',character_id:'furuhonya'},{id:'hat',name:'모자',price:1000,kind:'wearable',slot:'hat',description:''},{id:'mug',name:'머그',price:1000,kind:'mug',description:''}];
+it('캐릭터 컬렉션은 옷·목도리와 방 꾸미기 사이에 둔다',()=>{const ids=SHOP_TABS.map(t=>t[0]);expect(ids.indexOf('appearance')).toBe(ids.indexOf('outfit')+1);expect(ids.indexOf('room')).toBe(ids.indexOf('appearance')+1);});
+it('선택한 캐릭터 컬렉션만 보여주고 다른 품목 분류와 전체에서도 캐릭터를 섞지 않는다',()=>{expect(shopItems(items,'appearance','furuhonya').map(i=>i.id)).toEqual(['kani','kani-baby']);expect(shopItems(items,'appearance','momonga').map(i=>i.id)).toEqual(['momo']);expect(shopItems(items,'all','furuhonya').map(i=>i.id)).toEqual(['kani','kani-baby','hat','mug']);expect(shopItems(items,'room','furuhonya').map(i=>i.id)).toEqual(['mug']);});
+
+it('모든 컬렉션 그림은 원본 봉제 굿즈와 연결되며, 실제 확인한 캐릭터·시리즈 조합만 등록한다',async()=>{
+ const {default:looks}=await import('./appearances.json');const ids=looks.map(a=>a.id);expect(new Set(ids).size).toBe(ids.length);expect(looks.filter(a=>a.series==='baby')).toHaveLength(6);expect(looks.filter(a=>a.series==='pajama-party')).toHaveLength(5);expect(looks.filter(a=>a.series==='mermaid-island')).toHaveLength(6);expect(looks.filter(a=>a.series==='sakura')).toHaveLength(6);
+ for(const look of looks){expect(look.sourcePage).toMatch(/^https:\/\/tobeol.com\/item\//);expect(look.width).toBeGreaterThan(0);expect(look.height).toBeGreaterThan(0);expect(look.x+look.width).toBeLessThanOrEqual(look.sheetWidth);expect(look.y+look.height).toBeLessThanOrEqual(look.sheetHeight);}
+ expect(looks.some(a=>a.id==='baby-anoko'||a.id==='pajama-party-furuhonya'||a.id==='sakura-anoko')).toBe(false);
+});
