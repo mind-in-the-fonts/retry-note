@@ -8,7 +8,7 @@ const anchors:Record<string,{cx:number;hat:number;face:number;body:number;head:n
  shisa:{cx:.48,hat:.1,face:.41,body:.69,head:.74,torso:.56},
  momonga:{cx:.4,hat:.17,face:.47,body:.72,head:.68,torso:.4},
  furuhonya:{cx:.5,hat:.22,face:.48,body:.72,head:.89,torso:.5},
- anoko:{cx:.6,hat:.17,face:.37,body:.68,head:.62,torso:.56}
+ anoko:{cx:.5,hat:.12,face:.38,body:.65,head:.78,torso:.5}
 };
 export function wearablePosition(character:string,slot:string):CSSProperties{const a=anchors[character]||anchors.usagi;return {left:a.cx*100+'%',top:(slot==='hat'?a.hat:slot==='face'?a.face:a.body)*100+'%',width:(slot==='outfit'?a.torso:a.head)*100+'%'};}
 export function Wearable({id}:{id:string}){return <svg className="wearable-art" viewBox="0 0 160 120" aria-hidden="true"><g stroke="#765844" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

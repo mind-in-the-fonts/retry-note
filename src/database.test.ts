@@ -203,3 +203,32 @@ describe('방 이름과 캐릭터 착용 아이템',()=>{
   await asUser(A);await call('public.game_place($1,false,50,65)',['straw-hat']);expect((await call('public.game_state()')).inventory.find((i:any)=>i.item_id==='straw-hat').placed).toBe(false);
  });
 });
+
+describe('캐릭터별 1px 착용 위치 저장',()=>{
+ it('아이템과 캐릭터별로 위치를 보존하고 다시 입혀도 초기화하지 않는다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['berry-beret']);await call('public.game_buy($1)',['straw-hat']);
+  await call('public.game_fit($1,$2,-12,9)',['berry-beret','momonga']);await call('public.game_fit($1,$2,4,-3)',['berry-beret','furuhonya']);await call('public.game_fit($1,$2,0,0)',['straw-hat','momonga']);
+  const state=await call('public.game_state()');const beret=state.inventory.find((i:any)=>i.item_id==='berry-beret');expect(beret.wearable_offsets).toEqual({momonga:{x:-12,y:9},furuhonya:{x:4,y:-3}});expect(beret.placed).toBe(false);
+  await call('public.game_place($1,true,50,65)',['berry-beret']);const visit=await call('public.game_visit($1)',[A]);expect(visit.inventory.find((i:any)=>i.item_id==='berry-beret').wearable_offsets).toEqual(beret.wearable_offsets);
+ });
+ it('구매하지 않은 아이템·다른 계정·가구·잘못된 위치는 저장하지 못한다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);for(const id of ['berry-beret','mug'])await call('public.game_buy($1)',[id]);
+  await expect(call('public.game_fit($1,$2,0,0)',['straw-hat','momonga'])).rejects.toThrow('구매한');await expect(call('public.game_fit($1,$2,0,0)',['mug','momonga'])).rejects.toThrow('구매한');await expect(call('public.game_fit($1,$2,101,0)',['berry-beret','momonga'])).rejects.toThrow('범위');await expect(call('public.game_fit($1,$2,0,0)',['berry-beret','other'])).rejects.toThrow('캐릭터');
+  await asUser(B);await expect(call('public.game_fit($1,$2,0,0)',['berry-beret','momonga'])).rejects.toThrow('구매한');
+ });
+});
+
+describe('봉제 굿즈를 참고한 캐릭터 일러스트 컬렉션',()=>{
+ it('구매한 모습만 적용하고 지정된 캐릭터로 전환하며 친구 방에 동일하게 보여준다',async()=>{
+  await call('public.game_state()');await expect(call('public.game_appearance($1)',['magical-momonga'])).rejects.toThrow('구매한');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);await call('public.game_buy($1)',['magical-momonga']);await call('public.game_appearance($1)',['magical-momonga']);let state=await call('public.game_state()');expect(state.wallet.character).toBe('momonga');expect(state.wallet.appearance_id).toBe('magical-momonga');
+  await asUser(B);const visit=await call('public.game_visit($1)',[A]);expect(visit.appearance_id).toBe('magical-momonga');await expect(call('public.game_appearance($1)',['magical-momonga'])).rejects.toThrow('구매한');
+ });
+ it('한벌 모습과 개별 장신구를 교체해도 구매·위치 기록을 잃지 않으며 기본 모습으로 돌아간다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);for(const id of ['magical-momonga','berry-beret'])await call('public.game_buy($1)',[id]);await call('public.game_fit($1,$2,2,-4)',['berry-beret','momonga']);await call('public.game_appearance($1)',['magical-momonga']);expect((await call('public.game_state()')).inventory.find((i:any)=>i.item_id==='berry-beret').placed).toBe(false);
+  await call('public.game_fit($1,$2,2,-4)',['berry-beret','momonga']);expect((await call('public.game_state()')).wallet.appearance_id).toBeNull();await call('public.game_appearance($1)',['magical-momonga']);await call('public.game_style($1,$2)',['momonga','cloud']);expect((await call('public.game_state()')).wallet.appearance_id).toBe('magical-momonga');await call('public.game_style($1,$2)',['furuhonya','cloud']);expect((await call('public.game_state()')).wallet.appearance_id).toBeNull();
+  await call('public.game_appearance($1)',['magical-momonga']);await call('public.game_appearance(null)');const state=await call('public.game_state()');expect(state.wallet.appearance_id).toBeNull();expect(state.inventory.find((i:any)=>i.item_id==='berry-beret').wearable_offsets.momonga).toEqual({x:2,y:-4});expect(state.inventory).toHaveLength(2);
+ });
+ it('캐릭터 모습은 가구로 배치할 수 없고 일반 가구를 캐릭터 모습으로 적용할 수 없다',async()=>{
+  await call('public.game_state()');await pg.exec(`reset role;update public.game_wallets set coins=100000 where user_id='${A}'`);await asUser(A);for(const id of ['magical-anoko','mug'])await call('public.game_buy($1)',[id]);await expect(call('public.game_place($1,true,50,65)',['magical-anoko'])).rejects.toThrow('보유한');await expect(call('public.game_appearance($1)',['mug'])).rejects.toThrow('구매한');
+ });
+});
