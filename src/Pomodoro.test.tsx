@@ -10,7 +10,7 @@ it('기존 같이 보기 초대 링크도 통합 공부방에서 바로 연다',
 it('좌측 메뉴는 목록을 열고 현재 방 상세와 미니 플레이어는 다시 돌아올 때까지 유지한다',async()=>{
  history.replaceState(null,'','/?room=11111111-1111-4111-8111-111111111111');const user=userEvent.setup();const onActive=vi.fn();
  function Navigation(){const [view,setView]=React.useState('room');return <><button onClick={()=>setView('list')}>좌측 뽀모도로</button><button onClick={()=>setView('other')}>다른 메뉴</button><button onClick={()=>setView('room')}>미니 플레이어 돌아가기</button><Pomodoro userId="a" onActive={onActive} showLobby={view==='list'} onShowRoom={()=>setView('room')}/></>;}
- render(<Navigation/>);await screen.findByRole('heading',{name:'기존 같이 보기'});expect(lifecycle.mount).toHaveBeenCalledTimes(1);
+ render(<Navigation/>);await screen.findByRole('heading',{name:'기존 같이 보기'});await waitFor(()=>expect(lifecycle.mount).toHaveBeenCalledTimes(1));
  await user.click(screen.getByRole('button',{name:'좌측 뽀모도로'}));expect(screen.getByRole('heading',{name:'우리, 같이 집중해요'})).toBeTruthy();expect(screen.queryByRole('heading',{name:'기존 같이 보기'})).toBeNull();expect(lifecycle.unmount).not.toHaveBeenCalled();expect(watch.leaveRoom).not.toHaveBeenCalled();expect(onActive).toHaveBeenLastCalledWith(true);
  await user.click(screen.getByRole('button',{name:'현재 공부방으로 돌아가기'}));expect(screen.getByRole('heading',{name:'기존 같이 보기'})).toBeTruthy();expect(screen.queryByRole('heading',{name:'우리, 같이 집중해요'})).toBeNull();
  await user.click(screen.getByRole('button',{name:'좌측 뽀모도로'}));await user.click(screen.getByRole('button',{name:'다른 메뉴'}));await user.click(screen.getByRole('button',{name:'미니 플레이어 돌아가기'}));expect(screen.getByRole('heading',{name:'기존 같이 보기'})).toBeTruthy();expect(lifecycle.mount).toHaveBeenCalledTimes(1);expect(watch.joinRoom).toHaveBeenCalledTimes(1);
